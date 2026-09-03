@@ -1,0 +1,26 @@
+{
+  "name": {
+    "en": "Statistics Mod",
+    "ru": "Статистика"
+  },
+  "description": {
+    "en": "readme.txt",
+    "ru": "readme_ru.txt"
+  },
+  "author": "PerryR",
+  "homepage": "https://github.com/PerryR-1971/Statistics-Mod",
+  "icon": "statistics.ico",
+  "version": "0.3",
+  "category": "gameplay",
+  "compatibility": {
+    "requires": [
+      "WoG",
+      "Era Erm Framework"
+    ],
+    "load_after": [
+      "WoG",
+      "Era Erm Framework"
+    ],
+    "incompatible": []
+  }
+}

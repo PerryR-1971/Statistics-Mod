@@ -1,0 +1,1082 @@
+ZVSE2
+; Statistics Mod 0.3
+; Requires: ERA 3 and Era Erm Framework
+; Open the statistics table by right-clicking the Quest Log button or with Shift + right-click on an empty map tile.
+
+!#DC(STATS_TABLE_DLG) = 711;
+
+; =============================================================================
+; PLAY TIME PER PLAYER
+; =============================================================================
+
+!?FU(Stats_Get_Local_Minute);
+; x1 = calculated local time in minutes
+!!FU(gem_GetLocalTime):P?y1/?y2/?y3/?y4/?y5/?y6;
+!!VRx1:Sy1 *12 +y2 *30 +y4 *24 +y5 *60 +y6;
+
+!?FU(Stats_Save_Turn_Start);
+!!OW:C?y1;
+!!FU|y1<0/y1>7:E;
+!!FU(Stats_Get_Local_Minute):P?y2;
+!!SN:W^Stats_Player_%Y1_Turn_Start_Minute^/y2;
+
+!?FU(OnStartOrLoad);
+!!FU(Stats_Save_Turn_Start):P;
+!!FU(Stats_Init_All_Resource_Snapshots):P;
+
+!?FU(OnEveryDay);
+!!FU(Stats_Save_Turn_Start):P;
+
+!?FU(WOG_EndOfTurn);
+!!OW:C?y1;
+!!FU|y1<0/y1>7:E;
+!!FU(Stats_Get_Local_Minute):P?y2;
+!!SN:W^Stats_Player_%Y1_Turn_Start_Minute^/?y3;
+!!VRy4:Sy2-y3;
+!!SN&y4>=0/y4<60:W^Stats_Player_%Y1_Game_Time_Minutes^/dy4;
+!!FU(Stats_Update_Player_Resources):Py1;
+!!SN&y4>=0/y4<60:W^Stats_Player_%Y1_Turns_Completed^/d1;
+
+!?FU(Stats_Get_Player_Time);
+; x1 = player, x2 = returned active play time in minutes
+!!SN:W^Stats_Player_%X1_Game_Time_Minutes^/?x2;
+!!FU(Stats_Get_Local_Minute):P?y1;
+!!SN:W^Stats_Player_%X1_Turn_Start_Minute^/?y2;
+!!VRy3:Sy1-y2;
+!!VRx2&y3>=0/y3<60:+y3;
+
+!?FU(Stats_Get_Average_Turn_Time);
+; x1 = player, x2 = average duration of completed turns in minutes
+!!VRx2:S0;
+!!SN:W^Stats_Player_%X1_Turns_Completed^/?y1;
+!!FU&y1<=0:E;
+!!SN:W^Stats_Player_%X1_Game_Time_Minutes^/?x2;
+!!VRx2::y1;
+
+; =============================================================================
+; APPROXIMATE PLAYER ECONOMY
+; Resource changes are sampled when a dialog opens and at the end of each turn.
+; =============================================================================
+
+!?FU(Stats_Init_Player_Resource_Snapshot);
+; x1 = player
+!!FU|x1<0/x1>7:E;
+!!SN:W^Stats_Player_%X1_Resource_Snapshot_Initialized^/?y1;
+!!FU&y1=1:E;
+!!re i/0/7;
+  !!OW:Rx1/i/?y2;
+  !!SN:W^Stats_Player_%X1_Resource_%i_Snapshot^/y2;
+!!en;
+!!SN:W^Stats_Player_%X1_Resource_Snapshot_Initialized^/1;
+
+!?FU(Stats_Init_All_Resource_Snapshots);
+!!re i/0/7;
+  !!FU(Stats_Init_Player_Resource_Snapshot):Pi;
+!!en;
+
+!?FU(Stats_Update_Player_Resources);
+; x1 = player. Positive net changes count as collected; negative gold changes count as spent.
+!!FU|x1<0/x1>7:E;
+!!SN:W^Stats_Player_%X1_Resource_Snapshot_Initialized^/?y1;
+!!if&y1=0;
+  !!FU(Stats_Init_Player_Resource_Snapshot):Px1;
+!!el;
+  !!re i/0/7;
+    !!OW:Rx1/i/?y2;
+    !!SN:W^Stats_Player_%X1_Resource_%i_Snapshot^/?y3;
+    !!VRy4:Sy2-y3;
+    !!SN&i<>6/y4>0:W^Stats_Player_%X1_Resources_Collected^/dy4;
+    !!SN&i=6/y4>0:W^Stats_Player_%X1_Gold_Collected^/dy4;
+    !!VRy5:Sy4*-1;
+    !!SN&i=6/y5>0:W^Stats_Player_%X1_Gold_Spent^/dy5;
+    !!SN:W^Stats_Player_%X1_Resource_%i_Snapshot^/y2;
+  !!en;
+!!en;
+
+; =============================================================================
+; CREATURES RECRUITED IN TOWNS
+; Compare all seven town dwelling populations. This also detects purchases made
+; through HD Mod's Buy All button, which does not emit an ERM recruitment event.
+; =============================================================================
+
+!?FU(Stats_Store_Town_Dwelling_Snapshot);
+; x1 = town ID
+!!FU&x1<0:E;
+!!re i/0/6;
+  !!CA0/x1:M1/i/?y1/?y2;
+  !!VRy1&y1<0:S0;
+  !!VRy2&y2<0:S0;
+  !!VRy3:Sy1;
+  !!VRy3&y2>y3:Sy2;
+  !!SN:W^Stats_Town_Dwelling_Snapshot_%i^/y3;
+!!en;
+!!VRi^Stats_Recruitment_Town^:Sx1;
+!!VRi^Stats_Recruitment_Snapshot_Ready^:S1;
+
+!?FU(Stats_Compare_Town_Dwelling_Snapshot);
+; x1 = town ID
+!!FU&i^Stats_Recruitment_Snapshot_Ready^<>1:E;
+!!FU&x1<>i^Stats_Recruitment_Town^:E;
+!!CA0/x1:O?y1;
+!!FU|y1<0/y1>7:E;
+!!VRy2:S0;
+!!re i/0/6;
+  !!CA0/x1:M1/i/?y3/?y4;
+  !!VRy3&y3<0:S0;
+  !!VRy4&y4<0:S0;
+  !!VRy5:Sy3;
+  !!VRy5&y4>y5:Sy4;
+  !!SN:W^Stats_Town_Dwelling_Snapshot_%i^/?y6;
+  !!VRy7:Sy6 -y5;
+  !!VRy2&y7>0:+y7;
+  !!SN:W^Stats_Town_Dwelling_Snapshot_%i^/y5;
+!!en;
+!!SN&y2>0:W^Stats_Player_%Y1_Creatures_Recruited^/dy2;
+
+; Store the populations when entering a town. Compare after every processed
+; town click and once more on exit in case a custom button bypasses ERM clicks.
+!?FU(OnOpenTownScreen);
+!#VA(townId:x);
+!!FU(Stats_Store_Town_Dwelling_Snapshot):P(townId);
+
+!?FU(OnTownMouseClick_Quit);
+!!FU(Stats_Compare_Town_Dwelling_Snapshot)&i^Stats_Recruitment_Snapshot_Ready^=1:Pi^Stats_Recruitment_Town^;
+
+!?FU(OnCloseTownScreen);
+!!FU(Stats_Compare_Town_Dwelling_Snapshot)&i^Stats_Recruitment_Snapshot_Ready^=1:Pi^Stats_Recruitment_Town^;
+!!VRi^Stats_Recruitment_Snapshot_Ready^:S0;
+
+; =============================================================================
+; CREATURES RECRUITED FROM EXTERNAL DWELLINGS
+; Compare the available populations before and after visiting map dwelling
+; types 17 and 20. Up to four offered creature stacks are supported.
+; =============================================================================
+
+!?FU(Stats_Store_External_Dwelling_Snapshot);
+; x1/x2/x3 = dwelling coordinates
+!!VRi^Stats_External_Dwelling_Snapshot_Ready^:S0;
+!!HE-1:O?y1;
+!!FU|y1<0/y1>7:E;
+!!VRi^Stats_External_Dwelling_Player^:Sy1;
+!!re i/0/3;
+  !!VRy2:S-1; !!VRy3:S0;
+  !!DWx1/x2/x3:Mi/?y2/?y3;
+  !!VRy3|y2<0/y3<0:S0;
+  !!SN:W^Stats_External_Dwelling_Start_%i^/y3;
+!!en;
+!!VRi^Stats_External_Dwelling_Snapshot_Ready^:S1;
+
+!?FU(Stats_Compare_External_Dwelling_Snapshot);
+; x1/x2/x3 = dwelling coordinates
+!!FU&i^Stats_External_Dwelling_Snapshot_Ready^<>1:E;
+!!VRy1:Si^Stats_External_Dwelling_Player^;
+!!VRy10:S0;
+!!re i/0/3;
+  !!VRy2:S-1; !!VRy3:S0;
+  !!DWx1/x2/x3:Mi/?y2/?y3;
+  !!VRy3|y2<0/y3<0:S0;
+  !!SN:W^Stats_External_Dwelling_Start_%i^/?y4;
+  !!VRy5:Sy4-y3;
+  !!VRy10&y5>0:+y5;
+!!en;
+!!SN&y1>=0/y1<=7/y10>0:W^Stats_Player_%Y1_External_Dwelling_Recruits^/dy10;
+!!VRi^Stats_External_Dwelling_Snapshot_Ready^:S0;
+
+!?OB17;
+!!FU(Stats_Store_External_Dwelling_Snapshot):Pv998/v999/v1000;
+
+!$OB17;
+!!FU(Stats_Compare_External_Dwelling_Snapshot):Pv998/v999/v1000;
+
+!?OB20;
+!!FU(Stats_Store_External_Dwelling_Snapshot):Pv998/v999/v1000;
+
+!$OB20;
+!!FU(Stats_Compare_External_Dwelling_Snapshot):Pv998/v999/v1000;
+
+; =============================================================================
+; ADVENTURE-MAP SPELLS
+; =============================================================================
+
+!?MG1;
+!!VRy1:Sv997;                           [Spell ID cast on the adventure map]
+!!FU|y1<0/y1>69:E;                     [Exit if no valid spell was cast]
+!!SSy1:F?y2;                            [Get spell flags]
+!!VRy3:Sy2;
+!!VRy3:&2;                              [0x00000002 = map spell]
+!!FU&y3=0:E;
+!!OW:C?y4;
+!!OW:Ay4/?y5;                           [Active hero of current player]
+!!FU|y5<0/y5>155:E;
+!!SN:W^Stats_Hero_%Y5_Adventure_Spells^/d1;
+
+; =============================================================================
+; TEMPORARY BATTLE STATISTICS
+; Ordinary battle values are committed after battle and rolled back if the
+; battle is replayed. Permanent ACM spell upgrades are deliberately retained.
+; =============================================================================
+
+!?FU(Stats_Reset_Battle_Hero);
+; x1 = hero ID
+!!FU|x1<0/x1>155:E;
+!!SN:W^Stats_Temp_Hero_%X1_Physical_Damage^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Melee_Damage^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Ranged_Damage^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Commander_Damage^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Magic_Damage^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Combat_Spells^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Commander_Casts^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Spell_Upgrades^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Enemy_Creatures_Killed^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Lost_Units^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Mana_Spent^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Mana_Before_Cast^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Mana_Cast_Pending^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Enemy_Heroes_Defeated^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Max_Physical_Hit^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Max_Magic_Hit^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Previous_Max_Physical_Hit^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Previous_Max_Magic_Hit^/0;
+!!SN:W^Stats_Temp_Hero_%X1_Committed^/0;
+
+!?FU(Stats_Store_Battle_Army);
+; x1 = hero ID. Store all seven army slots before combat.
+!!FU|x1<0/x1>155:E;
+!!re i/0/6;
+  !!VRy1:S-1; !!VRy2:S0;
+  !!HEx1:C0/i/?y1/?y2;
+  !!VRy2|y1<0/y2<0:S0;
+  !!SN:W^Stats_Temp_Hero_%X1_Army_Start_Type_%i^/y1;
+  !!SN:W^Stats_Temp_Hero_%X1_Army_Start_Count_%i^/y2;
+!!en;
+
+!?FU(Stats_Calculate_Battle_Lost_Units);
+; x1 = hero ID. Compare the surviving army with the pre-battle snapshot.
+!!FU|x1<0/x1>155:E;
+!!VRy10:S0;
+!!re i/0/6;
+  !!SN:W^Stats_Temp_Hero_%X1_Army_Start_Type_%i^/?y1;
+  !!SN:W^Stats_Temp_Hero_%X1_Army_Start_Count_%i^/?y2;
+  !!VRy3:S-1; !!VRy4:S0;
+  !!HEx1:C0/i/?y3/?y4;
+  !!VRy4|y3<0/y4<0:S0;
+  !!VRy5:Sy2;
+  !!VRy5&y1=y3:-y4;
+  !!VRy5&y5<0:S0;
+  !!VRy10:+y5;
+!!en;
+!!SN:W^Stats_Temp_Hero_%X1_Lost_Units^/y10;
+
+!?FU(OnBeforeBattleUniversal);
+!!BA:H0/?y1 H1/?y2;
+!!VRi^Stats_Battle_Hero_0^:Sy1;
+!!VRi^Stats_Battle_Hero_1^:Sy2;
+!!VRi^Stats_Battle_Replay_Hero^:S-1;
+!!OW:C?y3;
+!!if&y1>=0/y1<=155;
+  !!HEy1:O?y4;
+  !!VRi^Stats_Battle_Replay_Hero^&y4=y3:Sy1;
+!!en;
+!!if&i^Stats_Battle_Replay_Hero^<0/y2>=0/y2<=155;
+  !!HEy2:O?y4;
+  !!VRi^Stats_Battle_Replay_Hero^&y4=y3:Sy2;
+!!en;
+!!VRi^Stats_Actual_Magic_Action^:S0;
+!!FU(Stats_Reset_Battle_Hero):Py1;
+!!FU(Stats_Reset_Battle_Hero):Py2;
+!!FU(Stats_Store_Battle_Army):Py1;
+!!FU(Stats_Store_Battle_Army):Py2;
+
+; Store ACM's battle-wide spell-upgrade counter after battle setup. ACM resets
+; the counter at battle start, before this framework event is dispatched.
+!?FU(OnAfterBattleSetup);
+!!VRi^Stats_Spell_Upgrade_Battle_Hero^:S-1;
+!!VRi^Stats_Spell_Upgrade_Counter_Start^:S0;
+!!FU&i^Advanced_Classes_Mod_Active^<>1:E;
+!!SN:W^Upgrade_Counter^/?y1;
+!!VRi^Stats_Spell_Upgrade_Counter_Start^:Sy1;
+!!VRy2:Si^Stats_Battle_Hero_0^;
+!!VRy3:Si^Stats_Battle_Hero_1^;
+!!if&y2>=0/y2<=155;
+  !!HEy2:O?y4;
+  !!if&y4>=0/y4<=7;
+    !!OW:Iy4/?y5;
+    !!VRi^Stats_Spell_Upgrade_Battle_Hero^&y5<>1:Sy2;
+  !!en;
+!!en;
+!!if&i^Stats_Spell_Upgrade_Battle_Hero^<0/y3>=0/y3<=155;
+  !!HEy3:O?y4;
+  !!if&y4>=0/y4<=7;
+    !!OW:Iy4/?y5;
+    !!VRi^Stats_Spell_Upgrade_Battle_Hero^&y5<>1:Sy3;
+  !!en;
+!!en;
+
+!?FU(Stats_Record_Battle_Spell_Upgrades);
+!!FU&i^Advanced_Classes_Mod_Active^<>1:E;
+!!VRy1:Si^Stats_Spell_Upgrade_Battle_Hero^;
+!!FU|y1<0/y1>155:E;
+!!SN:W^Upgrade_Counter^/?y2;
+!!VRy3:Sy2 -i^Stats_Spell_Upgrade_Counter_Start^;
+!!SN&y3>0:W^Stats_Temp_Hero_%Y1_Spell_Upgrades^/y3;
+
+; Count spells cast by an ACM/WoG commander (creature IDs 174-191).
+!?FU(OnBeforeBattleAction);
+!!BG:A?y1;
+!!FU&y1<>10:E;                          [Only creature spell actions]
+!!BG:S?y2 N?y3 H?y4;
+!!FU&y2<>-1:E;                          [Only an actual creature spell cast]
+!!FU|y3<0/y3>41/y4<0/y4>155:E;
+!!BMy3:T?y5;
+!!FU|y5<174/y5>191:E;                  [WoG commander creature IDs]
+!!SN:W^Stats_Temp_Hero_%Y4_Commander_Casts^/d1;
+
+; Count one hero spell action. Damage from that spell is collected separately by MR1.
+!?BG0;
+!!BG:A?y1 S?y2 H?y3;
+!!VRi^Stats_Actual_Magic_Action^:S0;
+!!VRi^Stats_Actual_Magic_Action^|y1=1/y1=10:S1;
+!!FU&y1<>1:E;                           [Only hero spell actions]
+!!FU|y3<0/y3>155:E;
+!!SSy2:F?y4;
+!!VRy5:Sy4;
+!!VRy5:&1;                              [0x00000001 = battlefield spell]
+!!FU&y5=0:E;
+!!SN:W^Stats_Temp_Hero_%Y3_Combat_Spells^/d1;
+!!HEy3:I?y6;
+!!SN:W^Stats_Temp_Hero_%Y3_Mana_Before_Cast^/y6;
+!!SN:W^Stats_Temp_Hero_%Y3_Mana_Cast_Pending^/1;
+
+; Store the real spell-point difference after a hero spell action.
+!?FU(Stats_Record_Mana_After_Action);
+; x1 = hero ID
+!!FU|x1<0/x1>155:E;
+!!SN:W^Stats_Temp_Hero_%X1_Mana_Cast_Pending^/?y1;
+!!FU&y1=0:E;
+!!HEx1:I?y2;
+!!SN:W^Stats_Temp_Hero_%X1_Mana_Before_Cast^/?y3;
+!!VRy4:Sy3-y2;
+!!SN&y4>0:W^Stats_Temp_Hero_%X1_Mana_Spent^/dy4;
+!!SN:W^Stats_Temp_Hero_%X1_Mana_Cast_Pending^/0;
+
+!?BG1;
+!!FU(Stats_Record_Mana_After_Action):Pi^Stats_Battle_Hero_0^;
+!!FU(Stats_Record_Mana_After_Action):Pi^Stats_Battle_Hero_1^;
+!!VRi^Stats_Actual_Magic_Action^:S0;
+
+; Record casualties caused by one side for the opposing hero.
+!?FU(Stats_Record_Damage_Event);
+; x1 = target stack, x2 = reported damage
+!!FU|x1<0/x1>41/x2<=0:E;
+!!BMx1:N?y1 H?y2 L?y3 I?y4;
+!!FU|y1<=0/y2<=0/y4<0/y4>1:E;
+!!VRy5:Sy1*y2-y3;                     [Current total hit points of the target stack]
+!!VRy6:Sx2;
+!!VRy6&y6>y5:Sy5;                    [Ignore overkill damage]
+!!FU&y6<=0:E;
+
+!!VRy8:Sy6+y3 :y2;                   [Creatures killed by this damage event]
+!!VRy8&y8>y1:Sy1;
+!!FU&y8<=0:E;
+!!VRy9:Si^Stats_Battle_Hero_1^;
+!!VRy9&y4=1:Si^Stats_Battle_Hero_0^; [Opposing hero receives the kill credit]
+!!SN&y9>=0/y9<=155:W^Stats_Temp_Hero_%Y9_Enemy_Creatures_Killed^/dy8;
+
+!?MR1;
+!!FU&i^Stats_Actual_Magic_Action^=0:E;
+!!MR:N?y1 F?y2;
+!!FU(Stats_Record_Damage_Event):Py1/y2;
+
+; Physical damage caused by real attacks and shots. Unlike MF1, this event
+; explicitly identifies theoretical AI and mouse-hint calculations.
+!?FU(OnStackToStackDamage_Quit);
+!#VA(atkStack:x) (defStack:x) (finalDmgConst:x) (finalDmg:x) (basicDmg:x) (dmgBonus:x) (isDistant:x) (distanceArg:x) (isTheoretical:x);
+!!FU|(isTheoretical)/(finalDmg)<=0:E;
+!!FU|(atkStack)<0/(atkStack)>41/(defStack)<0/(defStack)>41:E;
+!!BM(atkStack):I?(atkSide:y) T?(atkType:y);
+!!FU|(atkSide)<0/(atkSide)>1:E;
+!!VR(hero:y):Si^Stats_Battle_Hero_0^;
+!!VR(hero)&(atkSide)=(BATTLE_RIGHT):Si^Stats_Battle_Hero_1^;
+!!FU|(hero)<0/(hero)>155:E;
+!!BM(defStack):N?(defNum:y) H?(defHp:y) L?(defLostHp:y);
+!!VR(actualDmg:y):S(defNum) *(defHp) -(defLostHp);
+!!VR(actualDmg)&(finalDmg)<(actualDmg):S(finalDmg);
+!!FU&(actualDmg)<=0:E;
+!!SN:W^Stats_Temp_Hero_%(hero)_Physical_Damage^/?(physicalTotal:y);
+!!VR(physicalTotal):+(actualDmg);
+!!SN:W^Stats_Temp_Hero_%(hero)_Physical_Damage^/(physicalTotal);
+!!if&(isDistant)=(FALSE);
+  !!SN:W^Stats_Temp_Hero_%(hero)_Melee_Damage^/?(meleeTotal:y);
+  !!VR(meleeTotal):+(actualDmg);
+  !!SN:W^Stats_Temp_Hero_%(hero)_Melee_Damage^/(meleeTotal);
+!!el;
+  !!SN:W^Stats_Temp_Hero_%(hero)_Ranged_Damage^/?(rangedTotal:y);
+  !!VR(rangedTotal):+(actualDmg);
+  !!SN:W^Stats_Temp_Hero_%(hero)_Ranged_Damage^/(rangedTotal);
+!!en;
+!!if&(atkType)>=174/(atkType)<=191;
+  !!SN:W^Stats_Temp_Hero_%(hero)_Commander_Damage^/?(commanderTotal:y);
+  !!VR(commanderTotal):+(actualDmg);
+  !!SN:W^Stats_Temp_Hero_%(hero)_Commander_Damage^/(commanderTotal);
+!!en;
+!!SN:W^Stats_Temp_Hero_%(hero)_Max_Physical_Hit^/?(oldMax:y);
+!!SN&(actualDmg)>(oldMax):W^Stats_Temp_Hero_%(hero)_Max_Physical_Hit^/(actualDmg);
+!!FU(Stats_Record_Damage_Event):P(defStack)/(actualDmg);
+
+; Damage caused directly by a hero spell.
+!?MR1;
+!!BG:A?y1;
+!!FU&y1<>1:E;                           [Ignore creature and commander spell damage]
+!!MR:N?y2 F?y3;
+!!FU&y3<=0:E;
+!!BG:H?y4;
+!!FU|y4<0/y4>155:E;
+!!BMy2:N?y5 H?y6 L?y7;
+!!VRy5:*y6-y7;
+!!VRy3&y3>y5:Sy5;                      [Do not count overkill damage]
+!!FU&y3<=0:E;
+!!SN:W^Stats_Temp_Hero_%Y4_Magic_Damage^/dy3;
+!!SN:W^Stats_Temp_Hero_%Y4_Max_Magic_Hit^/?y8;
+!!SN&y3>y8:W^Stats_Temp_Hero_%Y4_Max_Magic_Hit^/y3;
+
+; Direct damage caused by a WoG/ACM commander spell.
+!?MR1;
+!!BG:A?y1;
+!!FU&y1<>10:E;                          [Only creature spell actions]
+!!MR:N?y2 F?y3;
+!!FU&y3<=0:E;
+!!BG:H?y4 N?y8;
+!!FU|y4<0/y4>155/y8<0/y8>41:E;
+!!BMy8:T?y9;
+!!FU|y9<174/y9>191:E;                  [WoG commander creature IDs]
+!!BMy2:N?y5 H?y6 L?y7;
+!!VRy5:*y6-y7;
+!!VRy3&y3>y5:Sy5;                      [Do not count overkill damage]
+!!SN&y3>0:W^Stats_Temp_Hero_%Y4_Commander_Damage^/dy3;
+
+; Determine whether one hero defeated another hero in this battle.
+!?FU(Stats_Record_Defeated_Hero);
+!!VRy1:Si^Stats_Battle_Hero_0^;
+!!VRy2:Si^Stats_Battle_Hero_1^;
+!!FU|y1<0/y1>155/y2<0/y2>155:E;       [Both sides must have a hero]
+!!HEy1:O?y3;
+!!HEy2:O?y4;
+!!SN&y3>=0/y4<0:W^Stats_Temp_Hero_%Y1_Enemy_Heroes_Defeated^/1;
+!!SN&y4>=0/y3<0:W^Stats_Temp_Hero_%Y2_Enemy_Heroes_Defeated^/1;
+
+!?FU(Stats_Commit_Battle_Hero);
+; x1 = hero ID
+!!FU|x1<0/x1>155:E;
+!!SN:W^Stats_Temp_Hero_%X1_Committed^/?y1;
+!!FU&y1=1:E;
+!!SN:W^Stats_Temp_Hero_%X1_Physical_Damage^/?y2;
+!!SN:W^Stats_Temp_Hero_%X1_Melee_Damage^/?y27;
+!!SN:W^Stats_Temp_Hero_%X1_Ranged_Damage^/?y28;
+!!SN:W^Stats_Temp_Hero_%X1_Commander_Damage^/?y31;
+!!SN:W^Stats_Temp_Hero_%X1_Magic_Damage^/?y3;
+!!SN:W^Stats_Temp_Hero_%X1_Combat_Spells^/?y4;
+!!SN:W^Stats_Temp_Hero_%X1_Commander_Casts^/?y23;
+!!SN:W^Stats_Temp_Hero_%X1_Spell_Upgrades^/?y24;
+!!SN:W^Stats_Temp_Hero_%X1_Max_Physical_Hit^/?y5;
+!!SN:W^Stats_Temp_Hero_%X1_Max_Magic_Hit^/?y6;
+!!SN:W^Stats_Temp_Hero_%X1_Enemy_Creatures_Killed^/?y11;
+!!SN:W^Stats_Temp_Hero_%X1_Lost_Units^/?y12;
+!!SN:W^Stats_Temp_Hero_%X1_Mana_Spent^/?y13;
+!!SN:W^Stats_Temp_Hero_%X1_Enemy_Heroes_Defeated^/?y14;
+!!SN:W^Stats_Hero_%X1_Physical_Damage^/dy2;
+!!SN:W^Stats_Hero_%X1_Melee_Damage^/dy27;
+!!SN:W^Stats_Hero_%X1_Ranged_Damage^/dy28;
+!!SN:W^Stats_Hero_%X1_Commander_Damage^/dy31;
+!!SN:W^Stats_Hero_%X1_Magic_Damage^/dy3;
+!!SN:W^Stats_Hero_%X1_Combat_Spells^/dy4;
+!!SN:W^Stats_Hero_%X1_Commander_Casts^/dy23;
+!!SN:W^Stats_Hero_%X1_Spell_Upgrades^/dy24;
+!!SN:W^Stats_Hero_%X1_Enemy_Creatures_Killed^/dy11;
+!!SN:W^Stats_Hero_%X1_Lost_Units^/dy12;
+!!SN:W^Stats_Hero_%X1_Mana_Spent^/dy13;
+!!if&y14>0;
+  !!HEx1:O?y25;
+  !!SN&y25>=0/y25<=7:W^Stats_Player_%Y25_Enemy_Heroes_Defeated^/dy14;
+!!en;
+!!SN:W^Stats_Hero_%X1_Fights^/d1;
+!!SN:W^Stats_Hero_%X1_Max_Physical_Hit^/?y7;
+!!SN:W^Stats_Hero_%X1_Max_Magic_Hit^/?y8;
+!!SN:W^Stats_Temp_Hero_%X1_Previous_Max_Physical_Hit^/y7;
+!!SN:W^Stats_Temp_Hero_%X1_Previous_Max_Magic_Hit^/y8;
+!!SN&y5>y7:W^Stats_Hero_%X1_Max_Physical_Hit^/y5;
+!!SN&y6>y8:W^Stats_Hero_%X1_Max_Magic_Hit^/y6;
+!!SN:W^Stats_Temp_Hero_%X1_Committed^/1;
+
+!?FU(OnAfterBattleUniversal);
+!!FU(Stats_Record_Battle_Spell_Upgrades):P;
+!!FU(Stats_Record_Defeated_Hero):P;
+!!FU(Stats_Calculate_Battle_Lost_Units):Pi^Stats_Battle_Hero_0^;
+!!FU(Stats_Calculate_Battle_Lost_Units):Pi^Stats_Battle_Hero_1^;
+!!FU(Stats_Commit_Battle_Hero):Pi^Stats_Battle_Hero_0^;
+!!FU(Stats_Commit_Battle_Hero):Pi^Stats_Battle_Hero_1^;
+
+!?FU(Stats_Rollback_Battle_Hero);
+; x1 = hero ID
+!!FU|x1<0/x1>155:E;
+!!SN:W^Stats_Temp_Hero_%X1_Committed^/?y1;
+!!if&y1=1;
+  !!SN:W^Stats_Temp_Hero_%X1_Physical_Damage^/?y2;
+  !!SN:W^Stats_Temp_Hero_%X1_Melee_Damage^/?y27;
+  !!SN:W^Stats_Temp_Hero_%X1_Ranged_Damage^/?y28;
+  !!SN:W^Stats_Temp_Hero_%X1_Commander_Damage^/?y31;
+  !!SN:W^Stats_Temp_Hero_%X1_Magic_Damage^/?y3;
+  !!SN:W^Stats_Temp_Hero_%X1_Combat_Spells^/?y4;
+  !!SN:W^Stats_Temp_Hero_%X1_Commander_Casts^/?y23;
+  !!SN:W^Stats_Hero_%X1_Physical_Damage^/?y5;
+  !!SN:W^Stats_Hero_%X1_Melee_Damage^/?y29;
+  !!SN:W^Stats_Hero_%X1_Ranged_Damage^/?y30;
+  !!SN:W^Stats_Hero_%X1_Commander_Damage^/?y32;
+  !!SN:W^Stats_Hero_%X1_Magic_Damage^/?y6;
+  !!SN:W^Stats_Hero_%X1_Combat_Spells^/?y7;
+  !!SN:W^Stats_Hero_%X1_Commander_Casts^/?y24;
+  !!SN:W^Stats_Hero_%X1_Fights^/?y8;
+  !!SN:W^Stats_Temp_Hero_%X1_Previous_Max_Physical_Hit^/?y9;
+  !!SN:W^Stats_Temp_Hero_%X1_Previous_Max_Magic_Hit^/?y10;
+  !!SN:W^Stats_Temp_Hero_%X1_Enemy_Creatures_Killed^/?y11;
+  !!SN:W^Stats_Temp_Hero_%X1_Lost_Units^/?y12;
+  !!SN:W^Stats_Temp_Hero_%X1_Mana_Spent^/?y13;
+  !!SN:W^Stats_Temp_Hero_%X1_Enemy_Heroes_Defeated^/?y14;
+  !!SN:W^Stats_Hero_%X1_Enemy_Creatures_Killed^/?y15;
+  !!SN:W^Stats_Hero_%X1_Lost_Units^/?y16;
+  !!SN:W^Stats_Hero_%X1_Mana_Spent^/?y17;
+  !!VRy5:-y2; !!VRy5&y5<0:S0;
+  !!VRy29:-y27; !!VRy29&y29<0:S0;
+  !!VRy30:-y28; !!VRy30&y30<0:S0;
+  !!VRy32:-y31; !!VRy32&y32<0:S0;
+  !!VRy6:-y3; !!VRy6&y6<0:S0;
+  !!VRy7:-y4; !!VRy7&y7<0:S0;
+  !!VRy24:-y23; !!VRy24&y24<0:S0;
+  !!VRy8:-1;  !!VRy8&y8<0:S0;
+  !!VRy15:-y11; !!VRy15&y15<0:S0;
+  !!VRy16:-y12; !!VRy16&y16<0:S0;
+  !!VRy17:-y13; !!VRy17&y17<0:S0;
+  !!if&y14>0;
+    !!HEx1:O?y25;
+    !!SN&y25>=0/y25<=7:W^Stats_Player_%Y25_Enemy_Heroes_Defeated^/?y26;
+    !!VRy26:-y14;
+    !!VRy26&y26<0:S0;
+    !!SN&y25>=0/y25<=7:W^Stats_Player_%Y25_Enemy_Heroes_Defeated^/y26;
+  !!en;
+  !!SN:W^Stats_Hero_%X1_Physical_Damage^/y5;
+  !!SN:W^Stats_Hero_%X1_Melee_Damage^/y29;
+  !!SN:W^Stats_Hero_%X1_Ranged_Damage^/y30;
+  !!SN:W^Stats_Hero_%X1_Commander_Damage^/y32;
+  !!SN:W^Stats_Hero_%X1_Magic_Damage^/y6;
+  !!SN:W^Stats_Hero_%X1_Combat_Spells^/y7;
+  !!SN:W^Stats_Hero_%X1_Commander_Casts^/y24;
+  !!SN:W^Stats_Hero_%X1_Fights^/y8;
+  !!SN:W^Stats_Hero_%X1_Enemy_Creatures_Killed^/y15;
+  !!SN:W^Stats_Hero_%X1_Lost_Units^/y16;
+  !!SN:W^Stats_Hero_%X1_Mana_Spent^/y17;
+  !!SN:W^Stats_Hero_%X1_Max_Physical_Hit^/y9;
+  !!SN:W^Stats_Hero_%X1_Max_Magic_Hit^/y10;
+!!en;
+!!FU(Stats_Reset_Battle_Hero):Px1;
+
+!?FU(OnBattleReplay);
+!!VRy1:Si^Stats_Battle_Replay_Hero^;
+!!SN&y1>=0/y1<=155:W^Stats_Hero_%Y1_Battle_Replays^/d1;
+!!FU(Stats_Rollback_Battle_Hero):Pi^Stats_Battle_Hero_0^;
+!!FU(Stats_Rollback_Battle_Hero):Pi^Stats_Battle_Hero_1^;
+
+; Remember the owner before a hero visits a town.
+!?OB98;
+!!FU(Stats_Record_Map_Object_Visit):P;
+!!CA998:O?y1;
+!!HE-1:N?y4 O?y2;
+!!SN&y4>=0/y4<=155:W^Stats_Hero_%Y4_Towns_Visited^/d1;
+!!VRi^Stats_Visited_Town_Previous_Owner^:Sy1;
+!!VRi^Stats_Visited_Town_Hero_Owner^:Sy2;
+
+; A changed owner after the visit means that the visiting player captured it.
+!$OB98;
+!!CA998:O?y1;
+!!VRy2:Si^Stats_Visited_Town_Previous_Owner^;
+!!VRy3:Si^Stats_Visited_Town_Hero_Owner^;
+!!FU|y1<0/y1>7/y1=y2/y1<>y3:E;
+!!SN:W^Stats_Player_%Y1_Towns_Captured^/d1;
+
+; Count every concrete map object only once per hero. The marker contains the
+; hero, position, object type and subtype and is stored with the savegame.
+!?FU(Stats_Record_Map_Object_Visit);
+!!HE-1:N?y1;
+!!FU|y1<0/y1>155:E;
+!!OB998:T?y2 U?y3;
+!!SN:W^Stats_Hero_%Y1_Visited_Object_%V998_%V999_%V1000_%Y2_%Y3^/?y4;
+!!FU&y4>0:E;
+!!SN:W^Stats_Hero_%Y1_Visited_Object_%V998_%V999_%V1000_%Y2_%Y3^/1;
+!!SN:W^Stats_Hero_%Y1_Map_Objects_Visited^/d1;
+
+; Remember the original one-visit bit before the game handles the object.
+; x1 is the corresponding Format OV type used by HE:V.
+!?FU(Stats_Remember_Primary_Stat_Object_Visit);
+!!HE-1:N?y1;
+!!FU|y1<0/y1>155:E;
+!!HEy1:Vx1/?y2;
+!!SN:W^Stats_Primary_Visit_Pre_%Y1_%V998_%V999_%V1000^/y2;
+
+; Count the stat object only when its native visit bit changed from 0 to 1.
+!?FU(Stats_Record_Primary_Stat_Object_Visit);
+!!HE-1:N?y1;
+!!FU|y1<0/y1>155:E;
+!!SN:W^Stats_Primary_Visit_Pre_%Y1_%V998_%V999_%V1000^/?y2;
+!!HEy1:Vx1/?y3;
+!!FU&y2=y3:E;
+!!SN:W^Stats_Hero_%Y1_Primary_Stat_Objects_Visited^/d1;
+
+!?OB2;   !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB4;
+!!FU(Stats_Record_Map_Object_Visit):P;
+!!FU(Stats_Remember_Primary_Stat_Object_Visit):P7;
+!$OB4;
+!!FU(Stats_Record_Primary_Stat_Object_Visit):P7;
+!?OB5;
+!!FU(Stats_Record_Map_Object_Visit):P;
+!!HE-1:N?y1;
+!!VRi^Stats_Visited_Artifact_Hero^:Sy1;
+!?OB6;   !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB7;   !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB8;   !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB9;   !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB10;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB11;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB12;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB13;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB14;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB15;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB16;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB17;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB18;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB19;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB20;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB22;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB23;
+!!FU(Stats_Record_Map_Object_Visit):P;
+!!FU(Stats_Remember_Primary_Stat_Object_Visit):P1;
+!$OB23;
+!!FU(Stats_Record_Primary_Stat_Object_Visit):P1;
+!?OB24;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB25;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB26;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB27;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB28;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB29;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB30;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB31;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB32;
+!!FU(Stats_Record_Map_Object_Visit):P;
+!!FU(Stats_Remember_Primary_Stat_Object_Visit):P2;
+!$OB32;
+!!FU(Stats_Record_Primary_Stat_Object_Visit):P2;
+!?OB33;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB34;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB35;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB37;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB38;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB39;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB41;
+!!FU(Stats_Record_Map_Object_Visit):P;
+!!FU(Stats_Remember_Primary_Stat_Object_Visit):P6;
+!$OB41;
+!!FU(Stats_Record_Primary_Stat_Object_Visit):P6;
+!?OB42;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB43;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB44;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB45;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB47;
+!!FU(Stats_Record_Map_Object_Visit):P;
+!!FU(Stats_Remember_Primary_Stat_Object_Visit):P8;
+!$OB47;
+!!FU(Stats_Record_Primary_Stat_Object_Visit):P8;
+!?OB48;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB49;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB51;
+!!FU(Stats_Record_Map_Object_Visit):P;
+!!FU(Stats_Remember_Primary_Stat_Object_Visit):P3;
+!$OB51;
+!!FU(Stats_Record_Primary_Stat_Object_Visit):P3;
+!?OB52;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB54;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB55;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB56;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB57;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB58;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB59;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB60;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB61;
+!!FU(Stats_Record_Map_Object_Visit):P;
+!!FU(Stats_Remember_Primary_Stat_Object_Visit):P4;
+!$OB61;
+!!FU(Stats_Record_Primary_Stat_Object_Visit):P4;
+!?OB62;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB63;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB64;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB78;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB79;
+!!FU(Stats_Record_Map_Object_Visit):P;
+!!HE-1:N?y1;
+!!VRi^Stats_Visited_Resource_Hero^:Sy1;
+!?OB80;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB81;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB82;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB83;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB84;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB85;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB86;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB87;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB88;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB89;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB90;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB91;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB92;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB93;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB94;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB95;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB96;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB97;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB99;  !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB100; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB101; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB102; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB103; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB104; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB105; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB106; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB107;
+!!FU(Stats_Record_Map_Object_Visit):P;
+!!FU(Stats_Remember_Primary_Stat_Object_Visit):P9;
+!$OB107;
+!!FU(Stats_Record_Primary_Stat_Object_Visit):P9;
+!?OB108; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB109; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB110; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB111; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB112; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB113; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB212; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB213; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB215; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB219; !!FU(Stats_Record_Map_Object_Visit):P;
+!?OB221; !!FU(Stats_Record_Map_Object_Visit):P;
+
+; A normal treasure chest disappears during the visit, so count it beforehand.
+!?OB101/0;
+!!HE-1:N?y1;
+!!FU|y1<0/y1>155:E;
+!!SN:W^Stats_Hero_%Y1_Treasure_Chests_Collected^/d1;
+
+; Count an artifact or resource pile only if the object was actually removed
+; from the map during its visit.
+!$OB5;
+!!OB998:T?y1;
+!!FU&y1=(OBJ_ARTIFACT):E;
+!!VRy2:Si^Stats_Visited_Artifact_Hero^;
+!!FU|y2<0/y2>155:E;
+!!SN:W^Stats_Hero_%Y2_Artifacts_Collected^/d1;
+
+!$OB79;
+!!OB998:T?y1;
+!!FU&y1=(OBJ_RESOURCE):E;
+!!VRy2:Si^Stats_Visited_Resource_Hero^;
+!!FU|y2<0/y2>155:E;
+!!SN:W^Stats_Hero_%Y2_Resource_Piles_Collected^/d1;
+
+; Remember the mine owner before the visit and only count a real owner change.
+!?FU(Stats_Remember_Mine_Visit);
+!!VRi^Stats_Visited_Mine_Previous_Owner^:S-2;
+!!VRi^Stats_Visited_Mine_Hero_Owner^:S-1;
+!!MN998:O?y1;
+!!HE-1:N?y3 O?y2;
+!!SN&y3>=0/y3<=155:W^Stats_Hero_%Y3_Mines_Visited^/d1;
+!!VRi^Stats_Visited_Mine_Previous_Owner^:Sy1;
+!!VRi^Stats_Visited_Mine_Hero_Owner^:Sy2;
+
+!?FU(Stats_Record_Mine_Capture);
+!!VRy1:Si^Stats_Visited_Mine_Previous_Owner^;
+!!VRy2:Si^Stats_Visited_Mine_Hero_Owner^;
+!!MN998:O?y3;
+!!FU|y2<0/y2>7/y3<>y2/y3=y1:E;
+!!SN:W^Stats_Player_%Y2_Mines_Captured^/d1;
+
+!?OB53;
+!!FU(Stats_Record_Map_Object_Visit):P;
+!!FU(Stats_Remember_Mine_Visit):P;
+
+!$OB53;
+!!FU(Stats_Record_Mine_Capture):P;
+
+!?OB220;
+!!FU(Stats_Record_Map_Object_Visit):P;
+!!FU(Stats_Remember_Mine_Visit):P;
+
+!$OB220;
+!!FU(Stats_Record_Mine_Capture):P;
+
+; Count travelled adventure-map tiles per hero.
+!?HM-1;
+!!HE-1:N?y1 R7/?y2;
+!!FU|y1<0/y1>155:E;
+!!SN:W^Stats_Hero_%Y1_Distance_Tiles^/d1;
+!!VRy2:&(BIT_18);
+!!SN&y2:W^Stats_Hero_%Y1_Sea_Distance_Tiles^/d1;
+
+; =============================================================================
+; DIALOG DATA
+; =============================================================================
+
+!?FU(Stats_Find_Hero);
+; x1 = player, x2 = current hero, x3 = direction (-1 or 1), x4 = result
+!!VRx4:S-1;
+!!re i/1/156;
+  !!VRy1:Sx2;
+  !!VRy1&x3>0:+i;
+  !!VRy1&x3<0:-i+312;
+  !!VRy1:%156;
+  !!HEy1:O?y2;
+  !!VRx4&x4<0/y2=x1:Sy1;
+!!en;
+
+!?FU(Stats_Get_Player_Totals);
+; x1 player; x2 fights, x3 physical, x4 magic, x5 combat spells, x6 map spells, x7 tiles
+!!VRx2:S0; !!VRx3:S0; !!VRx4:S0; !!VRx5:S0; !!VRx6:S0; !!VRx7:S0;
+!!re i/0/155;
+  !!HEi:O?y1;
+  !!if&y1=x1;
+    !!SN:W^Stats_Hero_%i_Fights^/?y2;
+    !!SN:W^Stats_Hero_%i_Physical_Damage^/?y3;
+    !!SN:W^Stats_Hero_%i_Magic_Damage^/?y4;
+    !!SN:W^Stats_Hero_%i_Combat_Spells^/?y5;
+    !!SN:W^Stats_Hero_%i_Adventure_Spells^/?y6;
+    !!SN:W^Stats_Hero_%i_Distance_Tiles^/?y7;
+    !!VRx2:+y2; !!VRx3:+y3; !!VRx4:+y4; !!VRx5:+y5; !!VRx6:+y6; !!VRx7:+y7;
+  !!en;
+!!en;
+
+; =============================================================================
+; WIDE TABLE DIALOG
+; =============================================================================
+
+!?FU(Stats_Update_Table_Dialog);
+!!VRz40:S^^; !!VRz41:S^^; !!VRz42:S^^; !!VRz43:S^^;
+!!VRz44:S^^; !!VRz45:S^^; !!VRz46:S^^; !!VRz47:S^^;
+!!VRz48:S^^; !!VRz49:S^^; !!VRz65:S^^; !!VRz66:S^^;
+!!VRz50:S^^; !!VRz51:S^^; !!VRz52:S^^; !!VRz53:S^^; !!VRz54:S^^;
+!!VRz55:S^^; !!VRz56:S^^; !!VRz57:S^^; !!VRz58:S^^; !!VRz59:S^^; !!VRz67:S^^;
+!!VRz68:S^^; !!VRz69:S^^; !!VRz70:S^^;
+!!VRz60:S^^; !!VRz61:S^^; !!VRz62:S^^; !!VRz63:S^^; !!VRz64:S^^;
+!!VRz71:S^^; !!VRz72:S^^; !!VRz73:S^^; !!VRz74:S^^; !!VRz75:S^^;
+!!VRz76:S^^; !!VRz77:S^^; !!VRz78:S^^; !!VRz79:S^^; !!VRz80:S^^;
+!!VRy2:Si^Stats_Dialog_Hero^;
+!!VRy3:Si^Stats_Dialog_Player^;
+
+!!SN:W^Stats_Dialog_Views^/?y19;
+!!SN:T^Statistics_Mod.Table_Title^/?z1/^views^/y19;
+!!SN:T^Statistics_Mod.Table_Combat_Heading^/?z4;
+!!SN:T^Statistics_Mod.Table_Magic_Heading^/?z5;
+!!SN:T^Statistics_Mod.Table_Exploration_Heading^/?z6;
+!!SN:T^Statistics_Mod.Table_Realm_Heading^/?z13;
+
+!!if&y2>=0/y2<=155;
+  !!HEy2:B0/?z-10;
+  !!SN:T^Statistics_Mod.Hero_Header^/?z3/^hero^/z-10;
+  !!FU(GetHeroPortraitName):Py2/0/?z7;
+  !!DL(STATS_TABLE_DLG):A20/11/z7/1 A20/4/1/1;
+!!el;
+  !!SN:T^Statistics_Mod.No_Hero^/?z3;
+  !!DL(STATS_TABLE_DLG):A20/4/0/1;
+!!en;
+
+; Values summed for the current player.
+!!FU(Stats_Update_Player_Resources):Py3;
+!!FU(Stats_Get_Player_Time):Py3/?y4;
+!!FU(Stats_Get_Average_Turn_Time):Py3/?y18;
+!!FU(Stats_Get_Player_Totals):Py3/?y5/?y6/?y7/?y8/?y9/?y10;
+!!VRy16:Sc;
+!!SN:W^Stats_Player_%Y3_Towns_Captured^/?y17;
+!!SN:W^Stats_Player_%Y3_Gold_Collected^/?y34;
+!!SN:W^Stats_Player_%Y3_Gold_Spent^/?y35;
+!!SN:W^Stats_Player_%Y3_Resources_Collected^/?y36;
+!!SN:W^Stats_Player_%Y3_Mines_Captured^/?y39;
+!!SN:W^Stats_Player_%Y3_Enemy_Heroes_Defeated^/?y40;
+!!SN:W^Stats_Player_%Y3_Creatures_Recruited^/?y55;
+!!SN:W^Stats_Player_%Y3_External_Dwelling_Recruits^/?y56;
+!!SN:T^Statistics_Mod.Line_Game_Day^/?z40/^value^/y16;
+!!SN:T^Statistics_Mod.Line_Play_Time_Average^/?z41/^time^/y4/^average^/y18;
+!!SN:T^Statistics_Mod.Line_Economy_Summary^/?z43/^gold^/y34/^spent^/y35/^resources^/y36;
+!!SN:T^Statistics_Mod.Line_Player_Combat_Summary^/?z46/^fights^/y5/^heroes^/y40;
+!!SN:T^Statistics_Mod.Line_Player_Activity_Summary^/?z48/^combat^/y8/^map^/y9/^distance^/y10;
+!!SN:T^Statistics_Mod.Line_Player_Conquests^/?z66/^towns^/y17/^mines^/y39;
+!!SN:T^Statistics_Mod.Line_Creatures_Recruited^/?z68/^towns^/y55/^dwellings^/y56;
+
+; Values belonging to the selected hero.
+!!if&y2>=0/y2<=155;
+  !!SN:W^Stats_Hero_%Y2_Fights^/?y20;
+  !!SN:W^Stats_Hero_%Y2_Physical_Damage^/?y21;
+  !!SN:W^Stats_Hero_%Y2_Melee_Damage^/?y52;
+  !!SN:W^Stats_Hero_%Y2_Ranged_Damage^/?y53;
+  !!SN:W^Stats_Hero_%Y2_Commander_Damage^/?y54;
+  !!SN:W^Stats_Hero_%Y2_Battle_Replays^/?y55;
+  !!SN:W^Stats_Hero_%Y2_Magic_Damage^/?y22;
+  !!SN:W^Stats_Hero_%Y2_Max_Physical_Hit^/?y23;
+  !!SN:W^Stats_Hero_%Y2_Max_Magic_Hit^/?y24;
+  !!SN:W^Stats_Hero_%Y2_Enemy_Creatures_Killed^/?y25;
+  !!SN:W^Stats_Hero_%Y2_Lost_Units^/?y26;
+  !!SN:W^Stats_Hero_%Y2_Combat_Spells^/?y28;
+  !!SN:W^Stats_Hero_%Y2_Adventure_Spells^/?y29;
+  !!SN:W^Stats_Hero_%Y2_Mana_Spent^/?y30;
+  !!SN:W^Stats_Hero_%Y2_Distance_Tiles^/?y31;
+  !!SN:W^Hero_%Y2_Arenas_taken^/?y36;
+  !!SN:W^Hero_%Y2_Raid_Boss_killed^/?y37;
+  !!SN:W^Hero_%Y2_Battle_Commaders_killed^/?y38;
+  !!SN:W^Stats_Hero_%Y2_Map_Objects_Visited^/?y39;
+  !!SN:W^Stats_Hero_%Y2_Treasure_Chests_Collected^/?y40;
+  !!SN:W^Stats_Hero_%Y2_Artifacts_Collected^/?y41;
+  !!SN:W^Stats_Hero_%Y2_Resource_Piles_Collected^/?y42;
+  !!SN:W^Stats_Hero_%Y2_Sea_Distance_Tiles^/?y43;
+  !!SN:W^Stats_Hero_%Y2_Primary_Stat_Objects_Visited^/?y44;
+  !!SN:W^Stats_Hero_%Y2_Towns_Visited^/?y45;
+  !!SN:W^Stats_Hero_%Y2_Mines_Visited^/?y46;
+  !!SN:W^Stats_Hero_%Y2_Commander_Casts^/?y49;
+  !!SN:W^Stats_Hero_%Y2_Spell_Upgrades^/?y50;
+  !!SN:W^Hero_%Y2_Chambers_taken^/?y51;
+  !!VRy47:Sy31-y43;
+  !!VRy47&y47<0:S0;
+  !!VRy48:Sy22;
+  !!VRy48&y28>0::y28;
+  !!VRy48&y28<=0:S0;
+  !!VRy33:Sy28+y29;
+  !!SN:T^Statistics_Mod.Line_Fights^/?z50/^value^/y20;
+  !!SN:T^Statistics_Mod.Line_Max_Physical_Hit^/?z51/^value^/y23;
+  !!SN:T^Statistics_Mod.Line_Creatures_Killed^/?z52/^value^/y25;
+  !!SN:T^Statistics_Mod.Line_Physical_Damage_Split^/?z54/^melee^/y52/^ranged^/y53;
+  !!SN:T^Statistics_Mod.Line_Lost_Units^/?z55/^value^/y26;
+  !!SN:T^Statistics_Mod.Line_Commander_Damage^/?z57/^value^/y54;
+  !!SN:T^Statistics_Mod.Line_Battle_Replays^/?z58/^value^/y55;
+  !!SN:T^Statistics_Mod.Line_Total_Spells^/?z60/^value^/y28/^map^/y29;
+  !!SN:T^Statistics_Mod.Line_Commander_Casts^/?z61/^value^/y49;
+  !!SN:T^Statistics_Mod.Line_Spell_Upgrades^/?z62/^value^/y50;
+  !!SN:T^Statistics_Mod.Line_Mana_Spent^/?z63/^value^/y30;
+  !!SN:T^Statistics_Mod.Line_Distance_Land_Sea^/?z64/^land^/y47/^sea^/y43;
+  !!SN:T^Statistics_Mod.Line_Map_Objects_Summary^/?z71/^total^/y39/^stats^/y44;
+  !!SN:T^Statistics_Mod.Line_Treasure_Chests^/?z72/^value^/y40;
+  !!SN:T^Statistics_Mod.Line_Artifacts_Collected^/?z74/^value^/y41;
+  !!SN:T^Statistics_Mod.Line_Resource_Piles_Collected^/?z75/^value^/y42;
+  !!SN:T^Statistics_Mod.Line_Magic_Damage^/?z76/^value^/y22;
+  !!SN:T^Statistics_Mod.Line_Max_Magic_Hit^/?z77/^value^/y24;
+  !!SN:T^Statistics_Mod.Line_Average_Magic_Damage^/?z78/^value^/y48;
+  !!SN:T^Statistics_Mod.Line_Towns_Mines_Visited^/?z79/^towns^/y45/^mines^/y46;
+  !!SN:T^Statistics_Mod.Line_Exploration_Victories^/?z80/^chambers^/y51/^arenas^/y36/^raids^/y37/^commanders^/y38;
+!!en;
+
+!!DL(STATS_TABLE_DLG):A1/3/z1/1 A3/3/z3/1;
+!!DL(STATS_TABLE_DLG):A10/3/z4/1 A11/3/z5/1 A12/3/z6/1 A13/3/z13/1;
+!!DL(STATS_TABLE_DLG):A40/3/z40/1 A41/3/z41/1 A43/3/z43/1 A46/3/z46/1;
+!!DL(STATS_TABLE_DLG):A48/3/z48/1 A66/3/z66/1;
+!!DL(STATS_TABLE_DLG):A50/3/z50/1 A51/3/z51/1 A52/3/z52/1 A54/3/z54/1;
+!!DL(STATS_TABLE_DLG):A55/3/z55/1 A57/3/z57/1 A58/3/z58/1 A68/3/z68/1;
+!!DL(STATS_TABLE_DLG):A60/3/z60/1 A61/3/z61/1 A62/3/z62/1 A63/3/z63/1;
+!!DL(STATS_TABLE_DLG):A76/3/z76/1 A77/3/z77/1 A78/3/z78/1;
+!!DL(STATS_TABLE_DLG):A64/3/z64/1 A71/3/z71/1 A72/3/z72/1 A74/3/z74/1 A75/3/z75/1;
+!!DL(STATS_TABLE_DLG):A79/3/z79/1 A80/3/z80/1;
+
+!?FU(Stats_Set_Table_Hints);
+!!SN:T^Statistics_Mod.Hint_Table_Title^/?z101;
+!!SN:T^Statistics_Mod.Hint_Hero_Portrait^/?z102;
+!!SN:T^Statistics_Mod.Hint_Hero_Name^/?z103;
+!!SN:T^Statistics_Mod.Hint_Combat_Category^/?z104;
+!!SN:T^Statistics_Mod.Hint_Magic_Category^/?z105;
+!!SN:T^Statistics_Mod.Hint_Exploration_Category^/?z106;
+!!SN:T^Statistics_Mod.Hint_Realm_Category^/?z107;
+!!SN:T^Statistics_Mod.Hint_Close_Table^/?z108;
+!!SN:T^Statistics_Mod.Hint_Hero_Fights^/?z109;
+!!SN:T^Statistics_Mod.Hint_Max_Physical_Hit^/?z110;
+!!SN:T^Statistics_Mod.Hint_Hero_Kills^/?z111;
+!!SN:T^Statistics_Mod.Hint_Hero_Physical_Damage^/?z112;
+!!SN:T^Statistics_Mod.Hint_Hero_Lost_Units^/?z113;
+!!SN:T^Statistics_Mod.Hint_Commander_Damage^/?z114;
+!!SN:T^Statistics_Mod.Hint_Battle_Replays^/?z115;
+!!SN:T^Statistics_Mod.Hint_Hero_Magic_Damage^/?z116;
+!!SN:T^Statistics_Mod.Hint_Max_Magic_Hit^/?z117;
+!!SN:T^Statistics_Mod.Hint_Average_Magic_Damage^/?z118;
+!!SN:T^Statistics_Mod.Hint_Hero_Spells^/?z119;
+!!SN:T^Statistics_Mod.Hint_Commander_Casts^/?z120;
+!!SN:T^Statistics_Mod.Hint_Spell_Upgrades^/?z121;
+!!SN:T^Statistics_Mod.Hint_Mana_Spent^/?z122;
+!!SN:T^Statistics_Mod.Hint_Distance_Land_Sea^/?z123;
+!!SN:T^Statistics_Mod.Hint_Map_Objects^/?z124;
+!!SN:T^Statistics_Mod.Hint_Treasure_Chests^/?z125;
+!!SN:T^Statistics_Mod.Hint_Artifacts_Collected^/?z126;
+!!SN:T^Statistics_Mod.Hint_Resource_Piles^/?z127;
+!!SN:T^Statistics_Mod.Hint_Towns_Mines_Visited^/?z128;
+!!SN:T^Statistics_Mod.Hint_Exploration_Victories^/?z129;
+!!SN:T^Statistics_Mod.Hint_Game_Day^/?z130;
+!!SN:T^Statistics_Mod.Hint_Play_Time_Average^/?z131;
+!!SN:T^Statistics_Mod.Hint_Economy^/?z132;
+!!SN:T^Statistics_Mod.Hint_Player_Combat^/?z133;
+!!SN:T^Statistics_Mod.Hint_Player_Activity^/?z134;
+!!SN:T^Statistics_Mod.Hint_Player_Conquests^/?z135;
+!!SN:T^Statistics_Mod.Hint_Creatures_Recruited^/?z136;
+!!SN:T^Statistics_Mod.Hint_Previous_Hero^/?z137;
+!!SN:T^Statistics_Mod.Hint_Next_Hero^/?z138;
+!!DL(STATS_TABLE_DLG):H1/z101/1 H20/z102/1 H3/z103/1 H10/z104/1 H11/z105/1 H12/z106/1 H13/z107/1;
+!!DL(STATS_TABLE_DLG):H30722/z108/1 H22/z137/1 H23/z138/1;
+!!DL(STATS_TABLE_DLG):H50/z109/1 H51/z110/1 H52/z111/1 H54/z112/1 H55/z113/1 H57/z114/1 H58/z115/1;
+!!DL(STATS_TABLE_DLG):H76/z116/1 H77/z117/1 H78/z118/1 H60/z119/1 H61/z120/1 H62/z121/1 H63/z122/1;
+!!DL(STATS_TABLE_DLG):H64/z123/1 H71/z124/1 H72/z125/1 H74/z126/1 H75/z127/1 H79/z128/1 H80/z129/1;
+!!DL(STATS_TABLE_DLG):H40/z130/1 H41/z131/1 H43/z132/1 H46/z133/1 H48/z134/1 H66/z135/1 H68/z136/1;
+
+!?FU(Stats_Open_Table_Dialog);
+!!OW:C?y1;
+!!FU|y1<0/y1>7:E;
+!!OW:Ay1/?y2;
+!!FU(Stats_Find_Hero)&y2<0:Py1/-1/1/?y2;
+!!VRi^Stats_Dialog_Player^:Sy1;
+!!VRi^Stats_Dialog_Hero^:Sy2;
+!!SN:W^Stats_Dialog_Views^/d1;
+!!DL(STATS_TABLE_DLG):N^StatsTbl.txt^;
+!!VRz90:S^st_bg.pcx^;
+!!VRz91:S^st_prv.pcx^;
+!!VRz92:S^st_nxt.pcx^;
+!!VRz93:S^st_ok.pcx^;
+!!DL(STATS_TABLE_DLG):A100/11/z90/1 A22/11/z91/1 A23/11/z92/1 A30722/11/z93/1;
+!!FU(Stats_Set_Table_Hints):P;
+!!FU(Stats_Update_Table_Dialog):P;
+!!DL(STATS_TABLE_DLG):S1;
+
+; Shift + right-click on an empty adventure-map tile opens the statistics dialog.
+!?FU(OnAdventureMapRightMouseClick)&i^mouse_item^=(ITEM_ADVMAP_ADVENTURE_MAP)/i^key_shift^/i^key_ctrl^=0;
+!!CM:R(FALSE);
+!!FU(Stats_Open_Table_Dialog):P;
+
+; Ctrl + Shift + right-click remains available as an additional shortcut.
+!?FU(OnAdventureMapRightMouseClick)&i^mouse_item^=(ITEM_ADVMAP_ADVENTURE_MAP)/i^key_shift^/i^key_ctrl^;
+!!CM:R(FALSE);
+!!FU(Stats_Open_Table_Dialog):P;
+
+; Right-clicking the Quest Log button opens the statistics dialog.
+!?FU(OnAdventureMapRightMouseClick)&i^mouse_item^=(ITEM_ADVMAP_QUEST_LOG_BTN);
+!!CM:R(FALSE);
+!!FU(Stats_Open_Table_Dialog):P;
+
+; Previous and next owned hero in the table dialog.
+!?FU(OnCustomDialogEvent)&i^dlg_id^=(STATS_TABLE_DLG)/i^mouse_item^=22/i^mouse_action^=(MOUSE_LMB_RELEASED);
+!!FU(Stats_Find_Hero):Pi^Stats_Dialog_Player^/i^Stats_Dialog_Hero^/-1/?y1;
+!!VRi^Stats_Dialog_Hero^&y1>=0:Sy1;
+!!FU(Stats_Update_Table_Dialog):P;
+
+!?FU(OnCustomDialogEvent)&i^dlg_id^=(STATS_TABLE_DLG)/i^mouse_item^=23/i^mouse_action^=(MOUSE_LMB_RELEASED);
+!!FU(Stats_Find_Hero):Pi^Stats_Dialog_Player^/i^Stats_Dialog_Hero^/1/?y1;
+!!VRi^Stats_Dialog_Hero^&y1>=0:Sy1;
+!!FU(Stats_Update_Table_Dialog):P;
+
+; Close the table dialog with the OK button or Escape key.
+!?FU(OnCustomDialogEvent)&i^dlg_id^=(STATS_TABLE_DLG)/i^mouse_item^=30722/i^mouse_action^=(MOUSE_LMB_RELEASED);
+!!DL(STATS_TABLE_DLG):C1;
+
+!?FU(OnCustomDialogEvent)&i^dlg_id^=(STATS_TABLE_DLG)/i^dlg_action^=(DLG_ACTION_KEY_PRESSED)/i^key^=(KEY_ESCAPE);
+!!DL(STATS_TABLE_DLG):C1;

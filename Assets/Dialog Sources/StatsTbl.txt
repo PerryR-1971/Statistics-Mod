@@ -1,0 +1,45 @@
+
+
+
+	#	711	-1	-1	900	600	40	-1		90
+	Pcx	100	0	0	900	600	box64x32.pcx	2048	
+	Pcx	20	108	52	58	64	HPL000EL.pcx	2048	
+	Text	1	175	72	605	32	Session Statistics	BigFont.fnt	7	0	1	8	
+	Pcx	22	249	126	44	42	box64x32.pcx	2048	
+	Text	3	310	136	280	24	Hero	MedFont.fnt	7	0	1	8	
+	Pcx	23	613	126	44	42	box64x32.pcx	2048	
+	Text	10	80	190	340	24	Combat	MedFont.fnt	7	0	1	8	
+	Text	11	480	190	340	24	Magic	MedFont.fnt	7	0	1	8	
+	Text	12	80	363	340	24	Exploration	MedFont.fnt	7	0	1	8	
+	Text	13	480	363	340	24	Realm	MedFont.fnt	7	0	1	8	
+	Text	50	95	225	315	16	Value 1	SmalFont.fnt	7	0	0	8	
+	Text	51	95	240	315	16	Value 2	SmalFont.fnt	7	0	0	8	
+	Text	52	95	255	315	16	Value 3	SmalFont.fnt	7	0	0	8	
+	Text	54	95	270	315	16	Value 4	SmalFont.fnt	7	0	0	8	
+	Text	55	95	285	315	16	Value 5	SmalFont.fnt	7	0	0	8	
+	Text	57	95	300	315	16	Value 6	SmalFont.fnt	7	0	0	8	
+	Text	58	95	315	315	16	Value 7	SmalFont.fnt	7	0	0	8	
+	Text	76	500	225	310	16	Value 1	SmalFont.fnt	7	0	0	8	
+	Text	77	500	240	310	16	Value 2	SmalFont.fnt	7	0	0	8	
+	Text	78	500	255	310	16	Value 3	SmalFont.fnt	7	0	0	8	
+	Text	60	500	270	310	16	Value 4	SmalFont.fnt	7	0	0	8	
+	Text	61	500	285	310	16	Value 5	SmalFont.fnt	7	0	0	8	
+	Text	62	500	300	310	16	Value 6	SmalFont.fnt	7	0	0	8	
+	Text	63	500	315	310	16	Value 7	SmalFont.fnt	7	0	0	8	
+	Text	64	95	398	315	16	Value 1	SmalFont.fnt	7	0	0	8	
+	Text	71	95	413	315	16	Value 2	SmalFont.fnt	7	0	0	8	
+	Text	72	95	428	315	16	Value 3	SmalFont.fnt	7	0	0	8	
+	Text	74	95	443	315	16	Value 4	SmalFont.fnt	7	0	0	8	
+	Text	75	95	458	315	16	Value 5	SmalFont.fnt	7	0	0	8	
+	Text	79	95	473	315	16	Value 6	SmalFont.fnt	7	0	0	8	
+	Text	80	95	488	315	16	Value 7	SmalFont.fnt	7	0	0	8	
+	Text	40	500	398	310	16	Value 1	SmalFont.fnt	7	0	0	8	
+	Text	41	500	413	310	16	Value 2	SmalFont.fnt	7	0	0	8	
+	Text	43	500	428	310	16	Value 3	SmalFont.fnt	7	0	0	8	
+	Text	46	500	443	310	16	Value 4	SmalFont.fnt	7	0	0	8	
+	Text	48	500	458	310	16	Value 5	SmalFont.fnt	7	0	0	8	
+	Text	66	500	473	310	16	Value 6	SmalFont.fnt	7	0	0	8	
+	Text	68	500	488	310	16	Value 7	SmalFont.fnt	7	0	0	8	
+	Pcx	30722	749	522	72	68	box64x32.pcx	2048	
+hint area	Text hint	90	205	548	505	18		SmalFont.fnt	7	0	1	8	
+	#
