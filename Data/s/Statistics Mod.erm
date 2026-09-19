@@ -287,38 +287,33 @@ ZVSE2
 !!FU(Stats_Store_Battle_Army):Py1;
 !!FU(Stats_Store_Battle_Army):Py2;
 
-; Store ACM's battle-wide spell-upgrade counter after battle setup. ACM resets
-; the counter at battle start, before this framework event is dispatched.
+; Snapshot ACM's independent side counters after battle setup.
 !?FU(OnAfterBattleSetup);
-!!VRi^Stats_Spell_Upgrade_Battle_Hero^:S-1;
-!!VRi^Stats_Spell_Upgrade_Counter_Start^:S0;
+!!SN:W^Stats_Spell_Upgrade_Counter_Start_0^/0;
+!!SN:W^Stats_Spell_Upgrade_Counter_Start_1^/0;
 !!FU&i^Advanced_Classes_Mod_Active^<>1:E;
-!!SN:W^Upgrade_Counter^/?y1;
-!!VRi^Stats_Spell_Upgrade_Counter_Start^:Sy1;
-!!VRy2:Si^Stats_Battle_Hero_0^;
-!!VRy3:Si^Stats_Battle_Hero_1^;
-!!if&y2>=0/y2<=155;
-  !!HEy2:O?y4;
-  !!if&y4>=0/y4<=7;
-    !!OW:Iy4/?y5;
-    !!VRi^Stats_Spell_Upgrade_Battle_Hero^&y5<>1:Sy2;
-  !!en;
-!!en;
-!!if&i^Stats_Spell_Upgrade_Battle_Hero^<0/y3>=0/y3<=155;
-  !!HEy3:O?y4;
-  !!if&y4>=0/y4<=7;
-    !!OW:Iy4/?y5;
-    !!VRi^Stats_Spell_Upgrade_Battle_Hero^&y5<>1:Sy3;
-  !!en;
-!!en;
+!!SN:W^ACM_Trainer_Upgrade_Counter_0^/?y1;
+!!SN:W^Stats_Spell_Upgrade_Counter_Start_0^/y1;
+!!SN:W^ACM_Trainer_Upgrade_Counter_1^/?y1;
+!!SN:W^Stats_Spell_Upgrade_Counter_Start_1^/y1;
 
 !?FU(Stats_Record_Battle_Spell_Upgrades);
 !!FU&i^Advanced_Classes_Mod_Active^<>1:E;
-!!VRy1:Si^Stats_Spell_Upgrade_Battle_Hero^;
-!!FU|y1<0/y1>155:E;
-!!SN:W^Upgrade_Counter^/?y2;
-!!VRy3:Sy2 -i^Stats_Spell_Upgrade_Counter_Start^;
-!!SN&y3>0:W^Stats_Temp_Hero_%Y1_Spell_Upgrades^/y3;
+!!FU(Stats_Record_Side_Spell_Upgrades):P0/i^Stats_Battle_Hero_0^;
+!!FU(Stats_Record_Side_Spell_Upgrades):P1/i^Stats_Battle_Hero_1^;
+
+!?FU(Stats_Record_Side_Spell_Upgrades);
+; x1 = battle side, x2 = hero. Count each human hero's own upgrades.
+!!FU|x2<0/x2>155:E;
+!!HEx2:O?y4;
+!!FU|y4<0/y4>7:E;
+!!OW:Iy4/?y5;
+!!FU&y5=1:E;
+!!SN:W^ACM_Trainer_Upgrade_Counter_%X1^/?y2;
+!!SN:W^Stats_Spell_Upgrade_Counter_Start_%X1^/?y3;
+!!VRy3:Sy2 -y3;
+!!VRy3&y3<0:S0;
+!!SN:W^Stats_Temp_Hero_%X2_Spell_Upgrades^/y3;
 
 ; Count spells cast by an ACM/WoG commander (creature IDs 174-191).
 !?FU(OnBeforeBattleAction);

@@ -1,15 +1,24 @@
 {
+  "caption": {
+    "en_US": "Statistics Mod"
+  },
   "name": {
     "en": "Statistics Mod",
     "ru": "Статистика"
   },
   "description": {
+    "full": {
+      "en_US": "readme.txt"
+    },
     "en": "readme.txt",
     "ru": "readme_ru.txt"
   },
   "author": "PerryR",
   "homepage": "https://github.com/PerryR-1971/Statistics-Mod",
-  "icon": "statistics.ico",
+  "icon": {
+    "file": "statistics.ico"
+  },
+  "mod_version": "0.3",
   "version": "0.3",
   "category": "gameplay",
   "compatibility": {
